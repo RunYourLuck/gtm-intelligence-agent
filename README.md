@@ -1,5 +1,3 @@
-# GTM Intelligence Agent — Day 1
-
 # GTM Intelligence Agent
 
 An agent that researches a company and a job posting, then generates
