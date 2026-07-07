@@ -1,0 +1,15 @@
+# Environment / secrets
+.env
+*.key
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Generated output (personal briefs shouldn't be committed)
+briefs/
+
+# macOS
+.DS_Store
