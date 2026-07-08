@@ -31,7 +31,7 @@ from anthropic import Anthropic
 client = Anthropic()
 MODEL = "claude-sonnet-4-6"
 SEARCH_TOOL = [{"type": "web_search_20250305", "name": "web_search"}]
-FETCH_TOOL = [{"type": "web_fetch_20250124", "name": "web_fetch"}]
+FETCH_TOOL = [{"type": "web_fetch_20260318", "name": "web_fetch"}]
 # When fetching a job URL, expose both tools so Claude can follow
 # redirects or do a quick search if the page is behind a login wall.
 FETCH_AND_SEARCH_TOOLS = FETCH_TOOL + SEARCH_TOOL
