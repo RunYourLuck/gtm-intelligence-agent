@@ -1,5 +1,5 @@
 """
-Day 4 — GTM Intelligence Agent
+GTM Intelligence Agent
 Goal: wrap the Day 3 chain in a proper CLI tool — flags instead of
 interactive prompts, and output saved to a file so each run produces
 a real, shareable artifact.
@@ -14,8 +14,12 @@ how a "real tool" behaves. A real CLI tool:
   - Produces a durable output (a saved .md file), not just something
     that scrolls past in the terminal
 
-This is the same chain as Day 3 underneath — the point of Day 4 isn't
-new AI capability, it's making the tool feel and behave like a tool.
+Day 5 upgrade — web_fetch for job posting URLs
+----------------------------------------------
+When --role is a URL, we now use the dedicated web_fetch tool instead
+of web_search. web_fetch reads the full page content directly, so
+Claude gets the actual job description rather than searching around it.
+web_search is still used for text-based role lookups and company research.
 """
 
 import argparse
@@ -27,6 +31,10 @@ from anthropic import Anthropic
 client = Anthropic()
 MODEL = "claude-sonnet-4-6"
 SEARCH_TOOL = [{"type": "web_search_20250305", "name": "web_search"}]
+FETCH_TOOL = [{"type": "web_fetch_20250124", "name": "web_fetch"}]
+# When fetching a job URL, expose both tools so Claude can follow
+# redirects or do a quick search if the page is behind a login wall.
+FETCH_AND_SEARCH_TOOLS = FETCH_TOOL + SEARCH_TOOL
 
 
 def _extract_text(response):
@@ -55,23 +63,39 @@ def research_company(company_name):
 
 
 def research_role(role_input):
-    print("  -> Researching role/posting...")
+    """Research a role by either fetching a job posting URL directly
+    (using web_fetch for full page content) or searching for general
+    role information (using web_search)."""
     is_url = role_input.strip().startswith("http")
-    instruction = (
-        f"Fetch and read this job posting, then summarize: required "
-        f"skills, responsibilities, seniority level, and any signals "
-        f"about team structure or priorities. URL: {role_input}"
-        if is_url
-        else f"Research what this role typically involves and requires: {role_input}"
-    )
+
+    if is_url:
+        print(f"  -> Fetching job posting URL: {role_input}...")
+        tools = FETCH_AND_SEARCH_TOOLS
+        instruction = (
+            f"Use the web_fetch tool to fetch and read this job posting in full, "
+            f"then summarize: required skills, responsibilities, seniority level, "
+            f"and any signals about team structure or priorities. "
+            f"If the page requires login or returns an error, use web_search as a "
+            f"fallback to find the same posting. URL: {role_input}"
+        )
+    else:
+        print(f"  -> Researching role: '{role_input}'...")
+        tools = SEARCH_TOOL
+        instruction = (
+            f"Research what this role typically involves and requires: {role_input}"
+        )
+
     response = client.messages.create(
         model=MODEL,
-        max_tokens=1000,
+        max_tokens=1500,
         system=(
             "You are a GTM research analyst. Summarize job posting or "
-            "role information clearly and factually. Keep it under 300 words."
+            "role information clearly and factually. Keep it under 400 words. "
+            "Focus on: required skills, key responsibilities, seniority level, "
+            "team structure signals, and any hints about what the hiring manager "
+            "actually cares about."
         ),
-        tools=SEARCH_TOOL,
+        tools=tools,
         messages=[{"role": "user", "content": instruction}],
     )
     return _extract_text(response)
@@ -149,10 +173,10 @@ def main():
         description="GTM Intelligence Agent — generate a structured research "
         "briefing for a company and role."
     )
-    parser.add_argument("--company", required=True, help="Company name, e.g. Stripe")
+    parser.add_argument("--company", default=None, help="Company name, e.g. Stripe")
     parser.add_argument(
         "--role",
-        required=True,
+        default=None,
         help="Role title (e.g. 'Forward Deployed Engineer') or a job posting URL",
     )
     parser.add_argument(
@@ -178,6 +202,19 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # Hybrid mode: any required detail not passed as a flag gets asked
+    # for interactively (Day 3 behavior as a fallback).
+    if not args.company:
+        args.company = input("Company name: ").strip()
+    if not args.role:
+        args.role = input("Role title or job posting URL: ").strip()
+    if not args.company or not args.role:
+        parser.error("company and role are required")
+    if not args.background:
+        args.background = input("Your background/angle (optional, Enter to skip): ").strip()
+    if not args.years:
+        args.years = input("Years of relevant experience (optional, Enter to skip): ").strip()
 
     print(f"\nGTM Intelligence Agent — building briefing for {args.company}\n")
 
